@@ -6,10 +6,12 @@ import { useEffect, useState } from 'react';
  * @interface LoadingScreenProps
  * @property {boolean} isVisible - Controls the visibility of the loading screen
  * @property {string} [message] - Optional custom loading message
+ * @property {number} [externalProgress] - External progress control (0-100)
  */
 interface LoadingScreenProps {
   isVisible: boolean;
   message?: string;
+  externalProgress?: number;
 }
 
 /**
@@ -19,7 +21,7 @@ interface LoadingScreenProps {
  * @param {LoadingScreenProps} props - The props for the LoadingScreen component
  * @returns {JSX.Element | null} - The rendered LoadingScreen or null if not visible
  */
-export default function LoadingScreen({ isVisible, message }: LoadingScreenProps) {
+export default function LoadingScreen({ isVisible, message, externalProgress }: LoadingScreenProps) {
   const [progress, setProgress] = useState(0);
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [dots, setDots] = useState('');
@@ -31,9 +33,7 @@ export default function LoadingScreen({ isVisible, message }: LoadingScreenProps
     "Applying final enhancements...",
     "Preparing your result...",
     "Almost ready..."
-  ];
-
-  /**
+  ];  /**
    * Effect to animate progress bar and cycle through messages
    */
   useEffect(() => {
@@ -44,13 +44,31 @@ export default function LoadingScreen({ isVisible, message }: LoadingScreenProps
       return;
     }
 
-    // Progress animation
-    const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 95) return 95; // Stop at 95% until actual completion
-        return prev + Math.random() * 15 + 5; // Random progress increments
-      });
-    }, 300);
+    // If external progress is provided, use it directly
+    if (externalProgress !== undefined) {
+      setProgress(externalProgress);
+    } else {
+      // Fallback: Progress animation - smooth progression from 0 to 95% over ~30 seconds
+      const totalDuration = 30000; // 30 seconds
+      const intervalTime = 100; // Update every 100ms
+      const incrementPerUpdate = 95 / (totalDuration / intervalTime); // Stop at 95% until external control
+      
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          const newProgress = prev + incrementPerUpdate;
+          return newProgress >= 95 ? 95 : newProgress; // Cap at 95% until external control
+        });
+      }, intervalTime);
+
+      return () => {
+        clearInterval(progressInterval);
+      };
+    }
+  }, [isVisible, externalProgress]);
+
+  // Separate effect for message cycling and dots animation
+  useEffect(() => {
+    if (!isVisible) return;
 
     // Message cycling
     const messageInterval = setInterval(() => {
@@ -68,17 +86,27 @@ export default function LoadingScreen({ isVisible, message }: LoadingScreenProps
     }, 500);
 
     return () => {
-      clearInterval(progressInterval);
       clearInterval(messageInterval);
       clearInterval(dotsInterval);
     };
   }, [isVisible, loadingMessages.length]);
-
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-8 mx-4 max-w-md w-full shadow-2xl border border-gray-700">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md"
+      style={{
+        backgroundImage: `url('./src/assets/Backgroundimg.jpg')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      {/* Dark overlay for better readability */}
+      <div className="absolute inset-0 bg-black/80"></div>
+      
+      {/* Loading content */}
+      <div className="relative z-10 bg-gradient-to-br from-gray-900/90 to-gray-800/90 rounded-2xl p-8 mx-4 max-w-md w-full shadow-2xl border border-gray-700 backdrop-blur-sm">
         
         {/* Animated AI Brain Icon */}
         <div className="flex justify-center mb-6">
@@ -198,8 +226,7 @@ export default function LoadingScreen({ isVisible, message }: LoadingScreenProps
                 animationDuration: '2s'
               }}
             ></div>
-          ))}
-        </div>
+          ))}        </div>
       </div>
     </div>
   );
